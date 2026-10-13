@@ -1,0 +1,8 @@
+using Microsoft.AspNetCore.Mvc;using Microsoft.AspNetCore.Authorization;using Microsoft.EntityFrameworkCore;using System.Security.Claims;using EMedicine.Api.Data;using EMedicine.Api.DTOs;
+namespace EMedicine.Api.Controllers;
+[ApiController][Authorize][Route("api/users")]public class UsersController(AppDbContext db):ControllerBase{int Uid=>int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+[HttpGet("me")]public async Task<IActionResult> Me(){var u=await db.Users.FindAsync(Uid);return u==null?NotFound():Ok(new{u.Id,u.FirstName,u.LastName,u.Email,u.Phone,u.Address,u.DOB,u.Fund});}
+[HttpPut("me")]public async Task<IActionResult> Update(ProfileRequest r){var u=await db.Users.FindAsync(Uid);if(u==null)return NotFound();u.FirstName=r.FirstName;u.LastName=r.LastName;u.Phone=r.Phone;u.Address=r.Address;await db.SaveChangesAsync();return Ok();}
+[Authorize(Roles="Admin")][HttpGet("admin")]public async Task<IActionResult> All()=>Ok(await db.Users.Select(u=>new{u.Id,u.FirstName,u.LastName,u.Email,u.Phone,u.Role,u.Active,u.Fund,u.CreatedOn}).ToListAsync());
+[Authorize(Roles="Admin")][HttpPatch("{id:int}/funds")]public async Task<IActionResult> Funds(int id,FundRequest r){if(r.Amount<0||r.Amount>1000000)return BadRequest("Funds must be between 0 and 1000000");var u=await db.Users.FindAsync(id);if(u==null)return NotFound();u.Fund=r.Amount;await db.SaveChangesAsync();return Ok(new{u.Id,u.Fund});}
+[Authorize(Roles="Admin")][HttpGet("reports")]public async Task<IActionResult> Reports()=>Ok(new{users=await db.Users.CountAsync(),medicines=await db.Medicines.CountAsync(),orders=await db.Orders.CountAsync(),revenue=await db.Orders.Where(o=>o.Status!="Cancelled").SumAsync(o=>(decimal?)o.Total)??0});}
